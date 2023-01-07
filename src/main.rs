@@ -1,11 +1,11 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use walkdir::WalkDir;
 
 // Metadata
 mod id3_metadata;
 mod flac_metadata;
 
-fn extension_parser(path: &PathBuf) -> Result<&'static str, ()> {
+fn get_extension(path: &PathBuf) -> Result<&'static str, ()> {
     let extension  = path.extension();
     if extension.is_none() {
         return Err(());
@@ -25,13 +25,15 @@ fn extension_parser(path: &PathBuf) -> Result<&'static str, ()> {
 fn scan_directory(root : &str) {
     for path in WalkDir::new(root) {
         let path = path.unwrap().into_path();
-        let extension = extension_parser(&path);
+        let extension = get_extension(&path);
         let filename = String::from(path.file_name().unwrap().to_str().unwrap());
+        // Extract metadata from mp3, flac files, skipping other files
         let metadata = match extension {
             Ok("mp3") => id3_metadata::extract_metadata(path),
             Ok("flac") => flac_metadata::extract_metadata(path),
             _ => continue,
         };
+        // Check if extracting the metadata was succesful
         let (artist, album) = match metadata {
             Ok(result) => result,
             Err(msg) => {
@@ -39,7 +41,7 @@ fn scan_directory(root : &str) {
                 continue;
             }
         };
-        let destination = format!("{root}{artist}/{album}/{filename}");
+        let destination = format!("{root}/{artist}/{album}/{filename}");
         println!("{destination}");
     }
 }
@@ -48,5 +50,8 @@ fn main() {
     println!("Scanning folder");
     // /Volumes/M5/
     // /Users/gasparcorrea/test
+    if !Path::new("/Volumes/M5").is_dir() {
+        panic!("Root is not a folder");
+    }
     scan_directory("/Volumes/M5/");
 }
