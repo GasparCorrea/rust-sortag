@@ -1,0 +1,11 @@
+[package]
+name = "sortag"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+walkdir = "2"
+id3 = "1.6.0"
+metaflac = "0.2"
