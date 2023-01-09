@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use id3::{Tag, TagLike};
 
-pub fn extract_metadata(path: PathBuf) -> Result<(String, String), &'static str> {
+pub fn extract_metadata(path: &PathBuf) -> Result<(String, String), &'static str> {
     let tag = Tag::read_from_path(path);
     if tag.is_err() {
         return Err("Error reading tag");

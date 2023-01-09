@@ -1,5 +1,7 @@
 use std::path::{PathBuf, Path};
 use walkdir::WalkDir;
+use clap::Parser;
+use std::fs;
 
 // Metadata
 mod id3_metadata;
@@ -22,15 +24,15 @@ fn get_extension(path: &PathBuf) -> Result<&'static str, ()> {
     extension
 }
 
-fn scan_directory(root : &str) {
-    for path in WalkDir::new(root) {
+fn scan_directory(source : &str, target: &str) {
+    for path in WalkDir::new(source) {
         let path = path.unwrap().into_path();
         let extension = get_extension(&path);
         let filename = String::from(path.file_name().unwrap().to_str().unwrap());
         // Extract metadata from mp3, flac files, skipping other files
         let metadata = match extension {
-            Ok("mp3") => id3_metadata::extract_metadata(path),
-            Ok("flac") => flac_metadata::extract_metadata(path),
+            Ok("mp3") => id3_metadata::extract_metadata(&path),
+            Ok("flac") => flac_metadata::extract_metadata(&path),
             _ => continue,
         };
         // Check if extracting the metadata was succesful
@@ -41,17 +43,68 @@ fn scan_directory(root : &str) {
                 continue;
             }
         };
-        let destination = format!("{root}/{artist}/{album}/{filename}");
-        println!("{destination}");
+
+        let from = path.to_str().unwrap();
+        let to = format!("{target}/{artist}/{album}/");
+        // Create folder
+        if fs::create_dir_all(&to).is_err() {
+            println!("Failed to create directory");
+            continue;
+        }
+
+        // Move file to new folder
+        let to = format!("{to}{filename}");
+        match fs::rename(&from, &to) {
+            Err(msg) => {
+                println!("{msg}");
+                continue;
+            }
+            _ => continue
+        }
+    }
+}
+/// Sort audio files in folders based in their metadata
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+   /// Path of the folder to sort
+   source: String,
+
+   /// Path of the destination folder
+   target: String,
+
+   /// Show files as they are moved
+   #[arg(short, long, default_value_t = false)]
+   verbose: bool,
+}
+
+fn validate_dirs(source : &str, target: &str) {
+    let source = Path::new(&source);
+    let target = Path::new(&target);
+
+    // Check that both source and target are directories
+    if !source.is_dir() {
+        panic!("Source is not a directory");
+    }
+    if !target.is_dir() {
+        panic!("Target is not a directory");
+    }
+
+    // Check that target is not a subdirectory of source to avoid loop traversal
+    if target.starts_with(&source) {
+        panic!("Target can't be subdirectory of source");
     }
 }
 
 fn main() {
-    println!("Scanning folder");
+    // Get Args
+    let args = Args::parse();
+    let source = args.source; 
+    let target = args.target; 
+    validate_dirs(&source, &target);
     // /Volumes/M5/
     // /Users/gasparcorrea/test
-    if !Path::new("/Volumes/M5").is_dir() {
-        panic!("Root is not a folder");
-    }
-    scan_directory("/Volumes/M5/");
+    println!("Scanning folder");
+    println!("{}", args.verbose);
+    scan_directory(&source, &target);
 }
