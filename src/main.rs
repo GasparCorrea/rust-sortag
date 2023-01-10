@@ -24,45 +24,61 @@ fn get_extension(path: &PathBuf) -> Result<&'static str, ()> {
     extension
 }
 
-fn scan_directory(source : &str, target: &str) {
+fn scan_directory(source : &str, target: &str, verbose: bool) {
+    if verbose {
+        println!("Scanning files");
+    }
     for path in WalkDir::new(source) {
         let path = path.unwrap().into_path();
         let extension = get_extension(&path);
         let filename = String::from(path.file_name().unwrap().to_str().unwrap());
+
         // Extract metadata from mp3, flac files, skipping other files
         let metadata = match extension {
             Ok("mp3") => id3_metadata::extract_metadata(&path),
             Ok("flac") => flac_metadata::extract_metadata(&path),
             _ => continue,
         };
+
         // Check if extracting the metadata was succesful
         let (artist, album) = match metadata {
             Ok(result) => result,
             Err(msg) => {
-                println!("{filename}: {msg}");
+                if verbose {
+                    println!("{filename}: {msg}");
+                }
                 continue;
             }
         };
 
+        // Create folder
         let from = path.to_str().unwrap();
         let to = format!("{target}/{artist}/{album}/");
-        // Create folder
         if fs::create_dir_all(&to).is_err() {
-            println!("Failed to create directory");
+            if verbose {
+                println!("Failed to create directory for {from}");
+            }
             continue;
         }
 
         // Move file to new folder
         let to = format!("{to}{filename}");
         match fs::rename(&from, &to) {
-            Err(msg) => {
-                println!("{msg}");
+            Err(_) => {
+                if verbose {
+                    println!("Failed to move {from} to {to}");
+                }
                 continue;
             }
-            _ => continue
+            _ => {
+                if verbose {
+                    println!("{to}");
+                }
+            }
         }
     }
 }
+
 /// Sort audio files in folders based in their metadata
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -100,11 +116,10 @@ fn main() {
     // Get Args
     let args = Args::parse();
     let source = args.source; 
-    let target = args.target; 
+    let target = args.target;
+    let verbose = args.verbose;
     validate_dirs(&source, &target);
     // /Volumes/M5/
     // /Users/gasparcorrea/test
-    println!("Scanning folder");
-    println!("{}", args.verbose);
-    scan_directory(&source, &target);
+    scan_directory(&source, &target, verbose);
 }
